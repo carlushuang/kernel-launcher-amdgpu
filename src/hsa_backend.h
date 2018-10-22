@@ -4,15 +4,24 @@
 #include "hsa.h"
 #include "hsa_ext_amd.h"
 #include <string>
+#include <vector>
+#include <memory>
 
 class hsa_backend_helper;
 
-class hsa_dispatch_param{
+class hsa_dispatch_param : public dispatch_param{
 public:
-    std::string     code_file_name;
-    std::string     kernel_symbol;
-    size_t          kernel_arg_size;
+    std::string             code_file_name;
+    std::string             kernel_symbol;
+    size_t                  kernel_arg_size;
 
+    int local_size[3];
+    int global_size[3];
+
+    std::vector<std::unique_ptr<kernarg>>    kernel_arg_list;
+    void emplace_kernarg(kernarg * ka){
+        kernel_arg_list.emplace_back(std::unique_ptr<kernarg>(ka));
+    }
 };
 
 class hsa_backend : public backend{
@@ -21,19 +30,34 @@ public:
     hsa_backend();
     ~hsa_backend();
     virtual int init_backend();     // init platform, find device
-    virtual int setup_dispatch(void * param);   // prepare excutable, dispatch param
+    virtual int setup_dispatch(dispatch_param * param);   // prepare excutable, dispatch param
     virtual int dispatch();         // do dispatch
     virtual int wait();             // wait for finish
 
     virtual const char * name() const { return "hsa_backend"; }
 
     virtual void * alloc(size_t size, void * param);
-    virtual void   free(void * mem);
+    virtual kernarg * alloc_kernarg(size_t size);
+    template <typename T>
+    kernarg * alloc_kernarg_pod(T value){
+        //
+    }
+    virtual void free(void * mem);
 
     virtual int load_bin_from_file(const char * file_name);
 
+    //void alloc_kernarg_local(kernarg * ka);
+    //void assign_kernarg(kernarg *ka);
+
+    virtual int copy_to_local(kernarg * ka);
+    virtual int copy_from_local(kernarg * ka);
+
+    void feed_kernarg(kernarg * ka, size_t & offset);
+    void feed_kernarg_raw(const void * ptr, size_t size, size_t align, size_t & offset);
+
 private:
     hsa_agent_t agent_;
+    hsa_agent_t cpu_agent_;
     uint32_t queue_size_;
     hsa_queue_t* queue_;
     hsa_signal_t signal_;
