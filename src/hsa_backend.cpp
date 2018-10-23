@@ -291,8 +291,8 @@ int hsa_backend::copy_to_local(kernarg * ka){
 int hsa_backend::copy_from_local(kernarg * ka){
     hsa_status_t status;
     // ?
-    status = hsa_memory_assign_agent(ka->local_ptr(), cpu_agent_, HSA_ACCESS_PERMISSION_RW);
-    HSA_ENFORCE("hsa_memory_assign_agent", status);
+    //status = hsa_memory_assign_agent(ka->local_ptr(), cpu_agent_, HSA_ACCESS_PERMISSION_RW);
+    //HSA_ENFORCE("hsa_memory_assign_agent", status);
     status = hsa_memory_copy(ka->system_ptr(), ka->local_ptr(), ka->size());
     HSA_ENFORCE("hsa_memory_copy", status);
     return 0;
