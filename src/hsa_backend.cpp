@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstring>
+#include <stdio.h>
 
 #define HSA_ENFORCE(msg, rtn) \
             if(rtn != HSA_STATUS_SUCCESS) {\
@@ -139,7 +140,6 @@ int hsa_backend::setup_dispatch(dispatch_param * param){
     aql_ = (hsa_kernel_dispatch_packet_t*) (hsa_kernel_dispatch_packet_t*)(queue_->base_address) + (packet_index_ & queue_mask);
     const size_t aql_header_size = 4;
     memset((uint8_t*)aql_ + aql_header_size, 0, sizeof(*aql_) - aql_header_size);
-
     // initialize_packet
     aql_->completion_signal = signal_;
     aql_->workgroup_size_x = 1;
@@ -150,19 +150,15 @@ int hsa_backend::setup_dispatch(dispatch_param * param){
     aql_->grid_size_z = 1;
     aql_->group_segment_size = 0;
     aql_->private_segment_size = 0;
-
     // executable
     if (0 != load_bin_from_file(d_param->code_file_name.c_str()))
         return -1;
-    
     hsa_status_t status = hsa_executable_create(HSA_PROFILE_FULL, HSA_EXECUTABLE_STATE_UNFROZEN,
                                  NULL, &executable_);
     HSA_ENFORCE("hsa_executable_create", status);
-
     // Load code object
     status = hsa_executable_load_code_object(executable_, agent_, code_object_, NULL);
     HSA_ENFORCE("hsa_executable_load_code_object", status);
-
     // Freeze executable
     status = hsa_executable_freeze(executable_, NULL);
     HSA_ENFORCE("hsa_executable_freeze", status);
@@ -179,7 +175,6 @@ int hsa_backend::setup_dispatch(dispatch_param * param){
                                             HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_OBJECT,
                                             &code_handle);
     HSA_ENFORCE("hsa_executable_symbol_get_info", status);
-
     status = hsa_executable_symbol_get_info(kernel_symbol,
                     HSA_EXECUTABLE_SYMBOL_INFO_KERNEL_GROUP_SEGMENT_SIZE,
                     &group_static_size_);
@@ -193,11 +188,9 @@ int hsa_backend::setup_dispatch(dispatch_param * param){
     HSA_ENFORCE("hsa_memory_allocate", status);
     aql_->kernarg_address = kernarg;
     size_t kernarg_offset = 0;
-
     for(auto & ptr : d_param->kernel_arg_list){
         feed_kernarg(ptr.get(), kernarg_offset);
     }
-
     aql_->workgroup_size_x = d_param->local_size[0];
     aql_->workgroup_size_y = d_param->local_size[1];
     aql_->workgroup_size_z = d_param->local_size[2];
@@ -205,7 +198,6 @@ int hsa_backend::setup_dispatch(dispatch_param * param){
     aql_->grid_size_x = d_param->global_size[0];
     aql_->grid_size_y = d_param->global_size[1];
     aql_->grid_size_z = d_param->global_size[2];
-
     return 0;
 }
 
@@ -246,8 +238,18 @@ kernarg * hsa_backend::alloc_kernarg(size_t size){
 #endif
 }
 
+kernarg * hsa_backend::alloc_kernarg_pod(size_t bytes){
+    void* system_ptr = this->alloc(bytes, &this->system_region_);
+    if (!system_ptr) { return nullptr; }
+
+    kernarg * ka = new kernarg(bytes, nullptr,system_ptr, this);
+    ka->set_pod(true);
+    return ka;
+}
+
 void   hsa_backend::free(void * mem){
-    hsa_memory_free(mem);
+    if(mem)
+        hsa_memory_free(mem);
 }
 int hsa_backend::load_bin_from_file(const char * file_name){
     std::ifstream inf(file_name, std::ios::binary | std::ios::ate);
@@ -272,24 +274,35 @@ int hsa_backend::load_bin_from_file(const char * file_name){
 }
 void hsa_backend::feed_kernarg(kernarg * ka, size_t & offset){
     if(ka->pod())
-        feed_kernarg_raw(ka->local_ptr(), ka->size(), ka->size(), offset);
+        // direct copy pod value to kernarg_address
+        feed_kernarg_raw(ka->system_ptr(), ka->size(), ka->size(), offset);
     else
         feed_kernarg_raw(&ka->local_ptr(), sizeof(void*), sizeof(void*), offset);
 }
 void hsa_backend::feed_kernarg_raw(const void * ptr, size_t size, size_t align, size_t & offset){
     //assert((align & (align - 1)) == 0);
     offset = ((offset + align - 1) / align) * align;
-    memcpy((char*) aql_->kernarg_address + offset, ptr, size);
+    memcpy( (char*)aql_->kernarg_address + offset, ptr, size);
     offset += size;
 }
 int hsa_backend::copy_to_local(kernarg * ka){
     hsa_status_t status;
+    if(!ka->local_ptr() && !ka->system_ptr()){
+        std::cerr<<"ERROR: this kernarg can not copy to local, with system_ptr:"
+            <<ka->system_ptr()<<", local_ptr:"<<ka->local_ptr()<<std::endl;
+        return -1;
+    }
     status = hsa_memory_copy(ka->local_ptr(), ka->system_ptr(), ka->size());
     HSA_ENFORCE("hsa_memory_copy", status);
     return 0;
 }
 int hsa_backend::copy_from_local(kernarg * ka){
     hsa_status_t status;
+    if(!ka->local_ptr() && !ka->system_ptr()){
+        std::cerr<<"ERROR: this kernarg can not copy from local, with system_ptr:"
+            <<ka->system_ptr()<<", local_ptr:"<<ka->local_ptr()<<std::endl;
+        return -1;
+    }
     // ?
     //status = hsa_memory_assign_agent(ka->local_ptr(), cpu_agent_, HSA_ACCESS_PERMISSION_RW);
     //HSA_ENFORCE("hsa_memory_assign_agent", status);

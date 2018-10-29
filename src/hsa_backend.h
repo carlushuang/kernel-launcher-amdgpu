@@ -38,10 +38,8 @@ public:
 
     virtual void * alloc(size_t size, void * param);
     virtual kernarg * alloc_kernarg(size_t size);
-    template <typename T>
-    kernarg * alloc_kernarg_pod(T value){
-        //
-    }
+    virtual kernarg * alloc_kernarg_pod(size_t bytes);
+
     virtual void free(void * mem);
 
     virtual int load_bin_from_file(const char * file_name);

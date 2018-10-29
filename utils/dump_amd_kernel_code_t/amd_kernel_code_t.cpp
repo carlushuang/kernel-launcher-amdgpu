@@ -357,6 +357,7 @@ void dump_field(const char * label, uint8_t v){
 static int _dump_amd_kernel_code_t(amd_kernel_code_t * kernel_code){
     std::cout<<".amd_kernel_code_t"<<std::endl;
     // https://github.com/ROCm-Developer-Tools/ROCm-ComputeABI-Doc/blob/master/AMDGPU-ABI.md#amd-kernel-code-object-amd_kernel_code_t
+    // AMDKernelCodeTInfo.h, following print should match that in this header. current use llvm-7.0 source
     DUMP_FIELD(kernel_code, amd_kernel_code_version_major);
     DUMP_FIELD(kernel_code, amd_kernel_code_version_minor);
     DUMP_FIELD(kernel_code, amd_machine_kind);

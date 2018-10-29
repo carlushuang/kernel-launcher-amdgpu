@@ -21,6 +21,7 @@ public:
 
     virtual void * alloc(size_t size, void * param)=0;
     virtual kernarg * alloc_kernarg(size_t size) = 0;
+    virtual kernarg * alloc_kernarg_pod(size_t bytes) = 0;
     virtual void   free(void * mem)=0;
 
     virtual const char * name() const =0;
@@ -43,10 +44,10 @@ public:
         bytes_(bytes), dev_ptr_(dev), host_ptr_(host), back_(back), pod_(false)
     {}
     ~kernarg(){
-        if(pod_){
-            delete (char*)host_ptr_;
-            return;
-        }
+        //if(pod_){
+        //    back_->free(host_ptr_);
+        //    return;
+        //}
         if(host_ptr_ && back_)
             back_->free(host_ptr_);
         if(dev_ptr_ && back_)
@@ -55,14 +56,7 @@ public:
 
     size_t size() const {return bytes_;}
     bool  pod() const {return pod_;}
-
-    template<typename T>
-    void assign_pod(T value){
-        host_ptr_ = (void*)(new T);
-        bytes_ = sizeof(T);
-        std::memcpy(host_ptr_, &value, bytes_);
-        pod_ = true;
-    }
+    bool  set_pod(bool pod){pod_ = pod;}
 
     void to_local(){
         if(back_)
