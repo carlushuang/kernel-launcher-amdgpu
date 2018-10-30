@@ -33,6 +33,7 @@ vector_add:
         // max_scratch_backing_memory_byte_size = 0
         compute_pgm_rsrc1_vgprs = 1         // max(0, ceil(vgprs_used / 4) - 1)
         compute_pgm_rsrc1_sgprs = 1         // gfx9: 2 * max(0, ceil(sgprs_used / 16) - 1), gfx6-8: max(0, ceil(sgprs_used / 8) - 1)
+                                            // But can use gfx6-8 method for gfx9, since LSB of this register is ignored
         // compute_pgm_rsrc1_priority = 0   // default 0
         compute_pgm_rsrc1_float_mode = 192
         // compute_pgm_rsrc1_priv = 0
@@ -161,31 +162,4 @@ BB0_2:
 BB0_3:
     s_endpgm                                                   //
 
-
-.amd_amdgpu_hsa_metadata
-  Version: [ 1, 0 ]
-  Kernels:
-    - Name: vector_add
-      SymbolName: 'vector_add@kd'
-      Language: OpenCL C
-      LanguageVersion: [ 2, 0 ]
-      Args:
-        - Name: in
-          Size: 8
-          Align: 8
-          ValueKind: GlobalBuffer
-          ValueType: F32
-          AddrSpaceQual: Generic
-        - Name: out
-          Size: 8
-          Align: 8
-          ValueKind: GlobalBuffer
-          ValueType: F32
-          AddrSpaceQual: Generic
-        - Name: num
-          Size: 4
-          Align: 4
-          ValueKind: ByValue
-          ValueType: I32
-
-.end_amd_amdgpu_hsa_metadata
+// .amd_amdgpu_hsa_metadata section is not need in HSA runtime, but needed in OpenCL runtime

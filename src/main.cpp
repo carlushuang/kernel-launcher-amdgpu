@@ -77,9 +77,9 @@ void gen_vec(float * vec, int len){
         vec[i] = dist(e2);
     }
 }
-#define VEC_LEN 128
+#define VEC_LEN 1000
 #define GROUP_SIZE 64
-#define GRID_SIZE 1
+#define GRID_SIZE 12
 
 int vector_add(){
     int rtn;
@@ -117,7 +117,7 @@ int vector_add(){
     d_param.emplace_kernarg(ka_in);
     d_param.emplace_kernarg(ka_out);
     d_param.emplace_kernarg(ka_num);
-    d_param.code_file_name = "kernel/vector-add.co";
+    d_param.code_file_name = "kernel/vector-add-2.co";
     d_param.kernel_symbol = "vector_add";
     d_param.kernel_arg_size = 2*sizeof(void *) + sizeof(int);   // should be 20
     d_param.local_size[0] = GROUP_SIZE;
@@ -129,6 +129,10 @@ int vector_add(){
     rtn = engine->setup_dispatch(&d_param);
     if(rtn) return -1;
     std::cout<<"setup_dispatch ok"<<std::endl;
+
+    std::cout<<"in ptr:"<<ka_in->local_ptr()<<std::endl;
+    std::cout<<"out ptr:"<<ka_out->local_ptr()<<std::endl;
+    std::cout<<"num ptr:"<<ka_num->local_ptr()<<std::endl;
 
     rtn = engine->dispatch();
     if(rtn) return -1;
