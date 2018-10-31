@@ -59,12 +59,12 @@ Lbegin:
     v_addc_co_u32_e32   v8, vcc, v6, v3, vcc        // kernarg out addr hi32
 
     flat_load_dword     v4, v[4:5]                  // load kernarg in
-    s_nop 0
+    # s_nop 0
     flat_load_dword     v5, v[7:8]                  // load kernarg out
-    s_waitcnt           vmcnt(0) lgkmcnt(0)
+    s_waitcnt           vmcnt(0)
     v_add_f32_e32       v5, v4, v5                  // a+=b
     flat_store_dword    v[7:8], v5                  // store
-    s_waitcnt           vmcnt(0) lgkmcnt(0)
+    s_waitcnt           vmcnt(0)
 
     v_add_u32_e32       v0, s6, v0                  // i += blockDim.x*gridDim.x
     v_cmp_gt_i32_e32    vcc, s7, v0
