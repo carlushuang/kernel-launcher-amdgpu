@@ -6,7 +6,7 @@ find_package(LLVM REQUIRED PATHS ${LLVM_DIR} NO_DEFAULT_PATH)
 
 list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
 
-find_program(CLANG NAMES clang PATHS ${LLVM_TOOLS_BINARY_DIR})
+find_program(CLANG NAMES clang PATHS ${LLVM_TOOLS_BINARY_DIR} NO_DEFAULT_PATH)
 if (CLANG)
     message(STATUS "Found Clang: ${CLANG}")
 else()
@@ -47,7 +47,7 @@ macro(asm_assemble f)
 add_custom_command(
   OUTPUT ${f}.o
   COMMAND
-    ${CLANG}  -x assembler -target amdgcn--amdhsa -mcpu=${GPU_ARCH} -c -o ${f}.o ${CMAKE_CURRENT_SOURCE_DIR}/${f}.s
+    ${CLANG}  -x assembler -target amdgcn-amd-amdhsa--${GPU_ARCH} -mcpu=${GPU_ARCH} -c -o ${f}.o ${CMAKE_CURRENT_SOURCE_DIR}/${f}.s
   DEPENDS ${f}.s
   COMMENT "Assembling ${f}.s to ${f}.o"
 )
@@ -84,3 +84,4 @@ endmacro(use_cxx11)
 use_cxx11()
 
 add_subdirectory(src)
+
