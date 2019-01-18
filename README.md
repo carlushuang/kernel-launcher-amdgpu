@@ -208,3 +208,6 @@ To consider how much we save the binary size, we have:
 * vector-add-2.co_v2, 1232 byte (gen by manually re-orgnize ELF file)
 
 we have about **13.2%** (1232/4752) of origin file size.
+
+## note
+`e_entry` of ELF header and `p_vaddr` of text phdr, `sh_addr` of .text shdr should all be `0x1000`, 4096, size of a page. This is virtual addr where code should be loaded in memory.

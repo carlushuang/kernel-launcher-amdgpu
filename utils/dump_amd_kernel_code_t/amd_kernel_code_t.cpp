@@ -238,58 +238,18 @@ static void get_content_from_file(void * dst, long offset, size_t bytes, FILE * 
     fread(dst, bytes, 1, fd);
 }
 
-static int _next_string(const char * str, const int cur_idx, const int max_idx){
-    int idx = cur_idx;
-    while(str[idx] != '\0' && idx < max_idx)
-        idx++;
-    while(str[idx] == '\0' && idx < max_idx)
-        idx++;
-    return idx;
-}
-static int _locate_section_index(const char * strtbl, int len){
-    // \0 seperated string
-    int idx = 0;
-    int section = 0;
-    char * str;
-    char * sec_name;
-    int sec_name_len;
-
-    sec_name = getenv("TARGET_SECTION");
-    if(!sec_name){
-        sec_name = ".text";
-    }
-    sec_name_len = strlen(sec_name);
-    while(1){
-        str  = (char*)strtbl + idx;
-        if(!strncmp(str, sec_name, sec_name_len)){
-            break;
-        }
-        idx = _next_string(strtbl, idx, len);
-        if(idx >= len){
-            section = -1;   // not found
-            break;
-        }
-        section++;
-    }
-    return section;
-}
-
-static int elf_locate_text_sec(elf_handle_t * handle){
-    FILE *   fd = handle->fd;
+static int locate_section_index(elf_handle_t * handle, const char *target_sec_name){
     int      is_le = handle->is_little_endian;
+    FILE *   fd = handle->fd;
+    uint64_t e_shoff = 0;
+    uint16_t e_shstrndx = 0;
+    uint8_t * shstrtbl_content = 0;
+    uint64_t  shstrtbl_bytes = 0;
+    uint64_t  shstrtbl_offset = 0;
+
     long     offset;
     size_t   bytes;
 
-    uint16_t e_shstrndx = 0;
-    uint64_t e_shoff = 0;
-
-    uint8_t * strtbl_content = 0;
-    uint64_t  strtbl_bytes = 0;
-    uint64_t  strtbl_offset = 0;
-
-    int text_section_index = 0;
-
-    // e_shoff, Points to the start of the section header table.
     offset = handle->is_x64 ? 0x28:0x20;
     bytes  = handle->is_x64 ? 8:4;
     get_byte_from_file(&e_shoff, offset, bytes, fd, is_le);
@@ -299,26 +259,62 @@ static int elf_locate_text_sec(elf_handle_t * handle){
     bytes = 2;
     get_byte_from_file(&e_shstrndx, offset, bytes, fd, is_le);
 
-    // get strtbl size, .sh_size off section header of strtbl
+    // get shstrtab size, .sh_size off section header of strtbl
     offset = e_shoff + (handle->is_x64 ? 0x40:0x28) * e_shstrndx + 
                         (handle->is_x64 ? 0x20:0x14) /*sh_size offset*/;
     bytes = handle->is_x64 ? 8:4;
-    get_byte_from_file(&strtbl_bytes, offset, bytes, fd, is_le);
+    get_byte_from_file(&shstrtbl_bytes, offset, bytes, fd, is_le);
 
-    // get strtbl offset
+    // get shstrtbl offset
     offset = e_shoff + (handle->is_x64 ? 0x40:0x28) * e_shstrndx + 
                         (handle->is_x64 ? 0x18:0x10) /*sh_offset offset*/;
     bytes = handle->is_x64 ? 8:4;
-    get_byte_from_file(&strtbl_offset, offset, bytes, fd, is_le);
+    get_byte_from_file(&shstrtbl_offset, offset, bytes, fd, is_le);
 
-    strtbl_content = (uint8_t *)malloc(strtbl_bytes);
-    assert(strtbl_content);
-    get_content_from_file(strtbl_content, strtbl_offset, strtbl_bytes, fd);
+    shstrtbl_content = (uint8_t *)malloc(shstrtbl_bytes);
+    assert(shstrtbl_content);
+    get_content_from_file(shstrtbl_content, shstrtbl_offset, shstrtbl_bytes, fd);
 
-    text_section_index = _locate_section_index((const char*)strtbl_content, strtbl_bytes);
+
+    uint16_t e_shnum;
+    offset = handle->is_x64 ? 0x3C:0x30;
+    bytes = 2;
+    get_byte_from_file(&e_shnum, offset, bytes, fd, is_le);
+
+    int i;
+    for(i=0;i<e_shnum;i++){
+        uint32_t sh_name;
+        offset = e_shoff + (handle->is_x64 ? 0x40:0x28) * i;
+        bytes = 4;
+        get_byte_from_file(&sh_name, offset, bytes, fd, is_le);
+        if(!strcmp((const char*)(shstrtbl_content+sh_name), target_sec_name)){
+            free(shstrtbl_content);
+            return i;
+        }
+    }
+    free(shstrtbl_content);
+    return -1;
+}
+
+static int elf_locate_text_sec(elf_handle_t * handle){
+    FILE *   fd = handle->fd;
+    int      is_le = handle->is_little_endian;
+    long     offset;
+    size_t   bytes;
+
+    uint64_t e_shoff = 0;
+
+    int text_section_index = 0;
+
+    // e_shoff, Points to the start of the section header table.
+    offset = handle->is_x64 ? 0x28:0x20;
+    bytes  = handle->is_x64 ? 8:4;
+    get_byte_from_file(&e_shoff, offset, bytes, fd, is_le);
+
+    text_section_index = locate_section_index(handle, ".text");
     if(text_section_index<0){
         printf("can't find text section, should not happen\n");
-        free(strtbl_content);
+        //free(strtbl_content);
         return -1;
     }
 
@@ -334,7 +330,7 @@ static int elf_locate_text_sec(elf_handle_t * handle){
     bytes = handle->is_x64 ? 8:4;
     get_byte_from_file(&handle->section_offset, offset, bytes, fd, is_le);
 
-    free(strtbl_content);
+    //free(strtbl_content);
     return 0;
 }
 
@@ -488,7 +484,7 @@ static int elf_dump_amd_kernel_code_t(elf_handle_t * handle){
         assert(sizeof(kernel_code) == AMD_KERNEL_CODE_T_BYTES);
         memcpy(&kernel_code, content, AMD_KERNEL_CODE_T_BYTES);
 
-        printf(".text section offset:%x, len:%lu\n", handle->section_offset, handle->section_byte);
+        printf(".text section offset:%lx, len:%lu\n", handle->section_offset, handle->section_byte);
         _dump_amd_kernel_code_t(&kernel_code);
         free(content);
     }
