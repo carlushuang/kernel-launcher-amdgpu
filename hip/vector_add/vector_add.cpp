@@ -19,14 +19,14 @@
     }
 #ifndef KERNEL_FROM_HSACO
 __global__
-inline void vec_add(float * in, float * out, int num){
+inline void vector_add(float * in, float * out, int num){
     for(int i=blockIdx.x * blockDim.x + threadIdx.x; i<num; i+= blockDim.x*gridDim.x){
         out[i] += in[i];
     }
 }
 #endif
 
-inline void host_vec_add(float * in, float * out, int num){
+inline void host_vector_add(float * in, float * out, int num){
     for(int i=0;i<num;i++){
         out[i] += in[i];
     }
@@ -96,10 +96,10 @@ int main(){
     HIPCHECK(hipModuleGetFunction(&kernel_func, module, "vector_add"));
     HIPCHECK(hipModuleLaunchKernel(kernel_func, GRID_SIZE,1,1, GROUP_SIZE,1,1,  0, 0, NULL, (void**)&config ));
 #else
-    hipLaunchKernelGGL(vec_add, dim3(GRID_SIZE), dim3(GROUP_SIZE), 0, 0, dev_in, dev_out, vec_len);
+    hipLaunchKernelGGL(vector_add, dim3(GRID_SIZE), dim3(GROUP_SIZE), 0, 0, dev_in, dev_out, vec_len);
 #endif
     HIPCHECK(hipMemcpy(host_out_2, dev_out, sizeof(float)*vec_len, hipMemcpyDeviceToHost));
-    host_vec_add(host_in, host_out, vec_len);
+    host_vector_add(host_in, host_out, vec_len);
 
     valid_vec(host_out, host_out_2, vec_len);
 
