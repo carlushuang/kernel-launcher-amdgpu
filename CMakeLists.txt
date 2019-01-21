@@ -2,15 +2,23 @@ cmake_minimum_required(VERSION 2.7)
 project(kernel_launcher_amdgpu)
 
 # find llvm
-find_package(LLVM REQUIRED PATHS ${LLVM_DIR} NO_DEFAULT_PATH)
+find_package(LLVM PATHS ${LLVM_DIR} NO_DEFAULT_PATH)
+
+if(LLVM_FOUND)
+  set(BUILD_HSA TRUE)
+else()
+  set(BUILD_HSA FALSE)
+endif()
 
 list(APPEND CMAKE_MODULE_PATH ${LLVM_CMAKE_DIR})
 
-find_program(CLANG NAMES clang PATHS ${LLVM_TOOLS_BINARY_DIR} NO_DEFAULT_PATH)
-if (CLANG)
-    message(STATUS "Found Clang: ${CLANG}")
-else()
-    message(STATUS "Clang not found")
+if(BUILD_HSA)
+  find_program(CLANG NAMES clang PATHS ${LLVM_TOOLS_BINARY_DIR} NO_DEFAULT_PATH)
+  if (CLANG)
+      message(STATUS "Found Clang: ${CLANG}")
+  else()
+      message(STATUS "Clang not found")
+  endif()
 endif()
 
 # path
@@ -44,6 +52,7 @@ else()
 endif()
 
 macro(asm_assemble f)
+if(BUILD_HSA)
 add_custom_command(
   OUTPUT ${f}.o
   COMMAND
@@ -51,9 +60,11 @@ add_custom_command(
   DEPENDS ${f}.s
   COMMENT "Assembling ${f}.s to ${f}.o"
 )
+endif()
 endmacro(asm_assemble)
 
 macro(asm_link f)
+if(BUILD_HSA)
 add_custom_command(
   OUTPUT ${f}.co
   COMMAND
@@ -61,14 +72,17 @@ add_custom_command(
   DEPENDS ${f}.o
   COMMENT "Linking ${f}.o to ${f}.co with clang"
 )
+endif()
 endmacro(asm_link)
 
 # single file example
 macro(asm_example f)
+if(BUILD_HSA)
   asm_assemble(${f})
   asm_link(${f})
   add_custom_target(${f}_co ALL DEPENDS ${f}.co)
   install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${f}.co DESTINATION bin COMPONENT examples)
+endif()
 endmacro(asm_example)
 
 macro(use_cxx11)
